@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:async';
 import 'package:window_manager/window_manager.dart';
 
 
@@ -75,6 +76,7 @@ class ColorSystem {
   // Border Color
   Color defaultBorderColor = Color(0xFFDBDBDB);
   Color focusedBorderColor = Color(0xFF353535);
+  bool isFocused = false;
 
   // Surface Color
   Color backgroundColor = Colors.white;
@@ -116,6 +118,18 @@ class ColorSystem {
       buttonTextColor = Colors.white;
     }
   }
+
+  Color inputBorderColor() {
+    return isFocused ? focusedBorderColor : defaultBorderColor;
+  }
+
+  void inputAreaFocused() {
+    isFocused = true;
+  }
+
+  void inputAreaUnfocused() {
+    isFocused = false;
+  }
 }
 
 class _MyHomePageState extends State<MyHomePage> {
@@ -133,6 +147,10 @@ class _MyHomePageState extends State<MyHomePage> {
   bool isLight = true;
   ColorSystem colorSystem = ColorSystem();
 
+  late Timer _timer;
+
+  bool isCursorOnOutput = false;
+
   @override
   void dispose() {
     // Clean up the controller when the widget is disposed.
@@ -145,10 +163,28 @@ class _MyHomePageState extends State<MyHomePage> {
     super.initState();
     _translateFrom = _english;
     _translateTo = _korean;
-    _translateText(myController.text, _translateTo);
-  }
+    _translateText(myController.text);
 
-  Future<void> _translateText(String text, String targetLanguage) async {
+    _timer = Timer(const Duration(milliseconds: 500), () {
+      _translateText(myController.text);
+    });
+    _timer.cancel();
+  }
+  
+  String unescape([String string = '']) {
+  return string
+      .replaceAll('&amp;', '&')
+      .replaceAll('&lt;', '<')
+      .replaceAll('&gt;', '>')
+      .replaceAll('&quot;', '"')
+      .replaceAll('&#39;', "'");
+}
+
+  Future<void> _translateText(String text) async {
+    // print("Execute translation : " + _translateFrom + " -> " + _translateTo);
+
+    String targetLanguage = _languageDetect(text);
+
     final url = 'https://translation.googleapis.com/language/translate/v2?key=$_apiKey';
 
     final tl = targetLanguage == _korean ? 'ko' : 'en';
@@ -167,7 +203,11 @@ class _MyHomePageState extends State<MyHomePage> {
     if(response.statusCode == 200) {
       final responseData = jsonDecode(response.body);
       setState(() {
-        _translatedText = responseData['data']['translations'][0]['translatedText'];
+        var res = responseData['data']['translations'][0]['translatedText'];
+        // res = unescape(res);
+        // print(res);
+        // some characters have to be unescaped.
+        _translatedText = unescape(res);
       });
     } else {
       setState(() {
@@ -176,6 +216,7 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
+  // you don't have to use this method manually
   void _toggleLanguage() {
     if(_translateFrom == _english) {
       setState(() {
@@ -188,6 +229,30 @@ class _MyHomePageState extends State<MyHomePage> {
         _translateTo = _korean;
       });
     } 
+  }
+
+  // you don't have to use this method manually
+  void _changeFromLanguage(String target) {
+    if(_translateFrom != target) _toggleLanguage();
+  }
+
+  // you don't have to use this method manually
+  // return : target language
+  String _languageDetect(String target) {
+    var englishPattern = RegExp(r'[a-zA-Z]');
+    var koreanPattern = RegExp(r'[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]');
+    
+    // character number of each language
+    var engMatchCount = englishPattern.allMatches(target).length;
+    var korMatchCount = koreanPattern.allMatches(target).length;
+    
+    if(engMatchCount >= korMatchCount) {
+      _changeFromLanguage(_english);
+    } else {
+      _changeFromLanguage(_korean);
+    }
+
+    return _translateTo;
   }
 
   void _toggleThemeMode() {
@@ -215,11 +280,14 @@ class _MyHomePageState extends State<MyHomePage> {
           ),
           child: Column(
             children: [
+              //
+              // Input Box
+              //
               Container(
                 height: 52,
                 decoration: BoxDecoration(
                   border: Border.all(
-                    color: colorSystem.focusedBorderColor,
+                    color: colorSystem.inputBorderColor(),
                   ),
                   borderRadius: BorderRadius.circular(4),
                 ),
@@ -248,8 +316,17 @@ class _MyHomePageState extends State<MyHomePage> {
                         height: 20,
                         child: Focus(
                           onFocusChange: (hasFocus) {
-                            // if(hasFocus) print('hi');
-                            // else print('bye');
+                            if(hasFocus) {
+                              // print('in');
+                              setState(() {
+                                colorSystem.inputAreaFocused();
+                              });
+                            } else {
+                              // print('bye');
+                              setState(() {
+                                colorSystem.inputAreaUnfocused();
+                              });
+                            } 
                           },
                           child: TextField(
                             decoration: InputDecoration(
@@ -271,7 +348,22 @@ class _MyHomePageState extends State<MyHomePage> {
                                 
                             controller: myController,
                             onEditingComplete: () {
-                              _translateText(myController.text, _translateTo);
+                              String target = myController.text;
+                              if(target.isNotEmpty) {
+                                _translateText(myController.text);
+                              }
+                            },
+                            onChanged: (value) {
+                              // if(value.endsWith(' ')) {
+                              //   _translateText(myController.text);
+                              // }
+                              if(_timer.isActive) {
+                                _timer.cancel();
+                              }
+                              _timer = Timer(const Duration(milliseconds: 400), () {
+                                _translateText(myController.text);
+                                // print("Translated");
+                              });
                             },
                           ),
                         ),
@@ -281,6 +373,10 @@ class _MyHomePageState extends State<MyHomePage> {
                 ),
               ),
               SizedBox(height: 8,),
+              //
+              // Swap Button
+              //
+              /*
               SizedBox(
                 height: 40,
                 child: ElevatedButton(
@@ -311,50 +407,95 @@ class _MyHomePageState extends State<MyHomePage> {
                 ),
               ),
               SizedBox(height: 8,),
-              Container(
-                height: 93,
-                decoration: BoxDecoration(
-                  border: Border.all(
-                    color: colorSystem.defaultBorderColor,
+              */
+              //
+              // Output
+              //
+              MouseRegion(
+                onEnter: (event) {
+                  // print("Enter");
+                  setState(() {
+                    isCursorOnOutput = true;
+                  });
+                },
+                onExit: (event) {
+                  // print("Exit");
+                  setState(() {
+                    isCursorOnOutput = false;
+                  });
+                },
+                // onHover: (event) {
+                //   isCursorOnOutput = true;
+                // },
+                child: Container(
+                  // when swap is exist
+                  // height: 93,
+                  height: 138,
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: colorSystem.defaultBorderColor,
+                    ),
+                    borderRadius: BorderRadius.circular(4),
+                    color: colorSystem.surfaceColor,
                   ),
-                  borderRadius: BorderRadius.circular(4),
-                  color: colorSystem.surfaceColor,
-                ),
-      
-                child: Padding(
-                  padding: EdgeInsets.symmetric(
-                    vertical: 9, 
-                    horizontal: 15
-                  ),
-      
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      
+                  child: Stack(
                     children: [
-                      SizedBox(
-                        height: 10,
-                        child: Center(
-                          widthFactor: 1,
-                          child: Text(
-                            _translateTo,
-                            style: FontSystem.labelTextStyle.copyWith(
-                              color: colorSystem.secondaryTextColor,
+                      Positioned.fill(
+                        bottom: 9, top: 9,
+                        left: 15, right: 15,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            SizedBox(
+                              height: 10,
+                              child: Center(
+                                widthFactor: 1,
+                                child: Text(
+                                  _translateTo,
+                                  style: FontSystem.labelTextStyle.copyWith(
+                                    color: colorSystem.secondaryTextColor,
+                                  ),
+                                ),
+                              ),
                             ),
-                          ),
+                            SizedBox(width: 268, height: 4,),
+                            Expanded(
+                              flex: 1,
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.vertical,
+                                child: SelectableText(
+                                  _translatedText,
+                                  style: FontSystem.regularTextStyle.copyWith(
+                                    color: colorSystem.primaryTextColor,
+                                    overflow: TextOverflow.visible
+                                  ),
+                                ),
+                              ),
+                            )
+                          ],
                         ),
                       ),
-                      SizedBox(width: 268, height: 4,),
-                      Expanded(
-                        flex: 1,
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.vertical,
-                          child: SelectableText(
-                            _translatedText,
-                            style: FontSystem.regularTextStyle.copyWith(
-                              color: colorSystem.primaryTextColor,
-                            ),
+                      Positioned(
+                        width: 24,
+                        height: 24,
+                        bottom: 16,
+                        right: 16,
+                        child:  isCursorOnOutput ? IconButton(
+                          onPressed: () {
+                            // print("copy");
+                            Clipboard.setData(ClipboardData(text: _translatedText));
+                          }, 
+                          style: IconButton.styleFrom(
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                            backgroundColor: Colors.black.withOpacity(0.4),
+                            padding: EdgeInsets.zero,
                           ),
-                        ),
+                          icon: SvgPicture.asset(
+                            'assets/imgs/copy_icon.svg',
+                          ),
+                        ) : SizedBox.shrink(),
                       )
                     ],
                   ),
