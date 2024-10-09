@@ -8,6 +8,8 @@ Happy Study!
 
 ## Getting Started
 
+Test branch is newest version of this project.
+
 You need to have your Google Translation API Key.
 
 If you have your API Key,
