@@ -14,7 +14,10 @@ void main() async {
 
   windowManager.setAlwaysOnTop(true);
 
-  windowManager.setSize(Size(314.4, 263.2));
+  // 300 x 222 -> +14.4, +43.2
+  // 300 x 248 -> 314.4, 291.2
+  // macos는 y offset -12 줄이기
+  windowManager.setSize(Size(314.4, 291.2));
   // windowManager.setMaximumSize(Size(314.4, 249.6));
   // windowManager.setMinimumSize(Size(314.4, 249.6));
   windowManager.setResizable(false);
@@ -75,7 +78,7 @@ class ColorSystem {
 
   // Border Color
   Color defaultBorderColor = Color(0xFFDBDBDB);
-  Color focusedBorderColor = Color(0xFF353535);
+  Color focusedBorderColor = Color(0xFF8F80FF);
   bool isFocused = false;
 
   // Surface Color
@@ -96,7 +99,7 @@ class ColorSystem {
   void chooseColor(bool isLight) {
     if(isLight) {
       defaultBorderColor = Color(0xFFDBDBDB);
-      focusedBorderColor = Color(0xFF353535);
+      focusedBorderColor = Color(0xFF8F80FF);
 
       backgroundColor = Colors.white;
       surfaceColor = Color(0xFFF4F5F6);
@@ -107,7 +110,7 @@ class ColorSystem {
       buttonTextColor = Colors.white;
     } else {
       defaultBorderColor = Color(0xFF505050);
-      focusedBorderColor = Color(0xFFA8A8A8);
+      focusedBorderColor = Color(0xFF8F80FF);
 
       backgroundColor = Color(0xFF353535);
       surfaceColor = Color(0xFF484848);
@@ -165,7 +168,7 @@ class _MyHomePageState extends State<MyHomePage> {
     _translateTo = _korean;
     _translateText(myController.text);
 
-    _timer = Timer(const Duration(milliseconds: 500), () {
+    _timer = Timer(const Duration(milliseconds: 100), () {
       _translateText(myController.text);
     });
     _timer.cancel();
@@ -182,7 +185,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Future<void> _translateText(String text) async {
     // print("Execute translation : " + _translateFrom + " -> " + _translateTo);
-
+    _translatedText = "번역중";
     String targetLanguage = _languageDetect(text);
 
     final url = 'https://translation.googleapis.com/language/translate/v2?key=$_apiKey';
@@ -284,12 +287,12 @@ class _MyHomePageState extends State<MyHomePage> {
               // Input Box
               //
               Container(
-                height: 52,
+                height: 108,
                 decoration: BoxDecoration(
                   border: Border.all(
                     color: colorSystem.inputBorderColor(),
                   ),
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
@@ -298,7 +301,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    mainAxisAlignment: MainAxisAlignment.start,
                     children: [
                       SizedBox(
                         height: 10,
@@ -312,8 +315,9 @@ class _MyHomePageState extends State<MyHomePage> {
                           ),
                         ),
                       ),
+                      SizedBox(height: 4),
                       SizedBox(
-                        height: 20,
+                        height: 68,
                         child: Focus(
                           onFocusChange: (hasFocus) {
                             if(hasFocus) {
@@ -342,7 +346,8 @@ class _MyHomePageState extends State<MyHomePage> {
                             style: FontSystem.regularTextStyle.copyWith(
                               color: colorSystem.primaryTextColor,
                             ),
-                                        
+                            keyboardType: TextInputType.multiline,
+                            maxLines: null,
                             cursorHeight: 18,
                             cursorWidth: 1.0,
                                 
@@ -360,10 +365,11 @@ class _MyHomePageState extends State<MyHomePage> {
                               if(_timer.isActive) {
                                 _timer.cancel();
                               }
-                              _timer = Timer(const Duration(milliseconds: 400), () {
+                              _timer = Timer(const Duration(milliseconds: 100), () {
                                 _translateText(myController.text);
                                 // print("Translated");
                               });
+                              // _translateText(myController.text);
                             },
                           ),
                         ),
@@ -373,41 +379,6 @@ class _MyHomePageState extends State<MyHomePage> {
                 ),
               ),
               SizedBox(height: 8,),
-              //
-              // Swap Button
-              //
-              /*
-              SizedBox(
-                height: 40,
-                child: ElevatedButton(
-                  onPressed: _toggleLanguage, 
-                  style: ElevatedButton.styleFrom(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                    backgroundColor: colorSystem.buttonSurfaceColor,
-                  ),
-                  
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                      
-                    children: [
-                      SvgPicture.asset(
-                        'assets/imgs/swap_icon.svg',
-                        width: 13.35,
-                        height: 13.35,
-                      ),
-                      SizedBox(width: 4,),
-                      Text(
-                        'Swap',
-                        style: FontSystem.buttonTextStyle.copyWith(
-                          color: colorSystem.buttonTextColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              SizedBox(height: 8,),
-              */
               //
               // Output
               //
@@ -428,14 +399,12 @@ class _MyHomePageState extends State<MyHomePage> {
                 //   isCursorOnOutput = true;
                 // },
                 child: Container(
-                  // when swap is exist
-                  // height: 93,
-                  height: 138,
+                  height: 108,
                   decoration: BoxDecoration(
                     border: Border.all(
                       color: colorSystem.defaultBorderColor,
                     ),
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius: BorderRadius.circular(8),
                     color: colorSystem.surfaceColor,
                   ),
                       
